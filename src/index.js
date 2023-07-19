@@ -69,6 +69,7 @@ document.getElementById('buttonCompile').addEventListener('click', async (e) => 
 
     var id;     // コンパイル・実行のリクエストID
     const input = '100 200 300';    // 標準入力
+    const except = '600\n';           // 期待する標準出力
 
     //-----------------------------
     // コンパイル・実行のリクエスト
@@ -119,8 +120,17 @@ document.getElementById('buttonCompile').addEventListener('click', async (e) => 
         console.log(responseData);
         console.log(responseData.stdout);
 
+        var buildErrorMsg = responseData.build_stderr;
+
+        var isCollect = responseData.build_result == 'success' && responseData.stdout == except;
+
         // 出力結果を表示
-        document.getElementById('output').innerText = `stdin: ${input}\nstdout: ${responseData.stdout}`;
+        document.getElementById('output').innerText = 
+`${isCollect ? '正解！' : '不正解…' }
+（ビルド結果: ${responseData.build_result} ${buildErrorMsg} ）
+標準入力: ${input}
+標準出力: ${responseData.stdout}
+期待する出力: ${except}`;
     })();
 
     // ボタンを有効化
