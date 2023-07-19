@@ -5,21 +5,23 @@
 
 // monaco-editor（コードエディタ）の読み込み＆表示
 var editor;
+
+
+function uriFromPath(_path) {
+    const path = require('path');
+    var pathName = path.resolve(_path).replace(/\\/g, '/');
+    if (pathName.length > 0 && pathName.charAt(0) !== '/') {
+        pathName = '/' + pathName;
+    }
+    console.log(pathName);
+    return encodeURI('file://' + pathName);
+}
 // ※無名関数を即時実行して、変数名被りを防ぐ（C++でスコープ使うのと同じ目的）
 (function () {
     // inspired by https://github.com/juanpahv/codexl
     const path = require('path');
     const amdLoader = require('../node_modules/monaco-editor/min/vs/loader.js');
     const amdRequire = amdLoader.require;
-
-    function uriFromPath(_path) {
-        var pathName = path.resolve(_path).replace(/\\/g, '/');
-        if (pathName.length > 0 && pathName.charAt(0) !== '/') {
-            pathName = '/' + pathName;
-        }
-        console.log(pathName);
-        return encodeURI('file://' + pathName);
-    }
     amdRequire.config({
         baseUrl: uriFromPath(path.join(__dirname, '../node_modules/monaco-editor/min'))
     });
@@ -48,7 +50,6 @@ int main()\n\
     });
 })();
 
-
 const { ipcRenderer } = require("electron");
 
 /**
@@ -61,28 +62,107 @@ function sleep(ms) {
 }
 
 /**
+ * Jsonファイルを読み込む
+ * @param {*} jsonPath 読み込みJsonファイルのパス
+ * @returns 読み込み結果
+ */
+function loadJson(jsonPath)
+{
+    const fs = require('fs');
+    const json = fs.readFileSync(jsonPath, 'utf8');
+    return JSON.parse(json);
+}
+
+/**
+ * 問題をロードする
+ * @param {*} filePath 問題zipファイルのパス
+ */
+async function loadProblem(filePath)
+{
+    const fsPromises = require('fs').promises;
+    const JSZip = require('jszip');
+
+    console.log('zip読み込み');
+    const buffer = await fsPromises.readFile(filePath);
+    const jsZip = await JSZip.loadAsync(buffer);
+    
+    // 問題情報jsonファイル取得
+    const jsonEntry = jsZip.file('problemInfo.json');
+    console.log(jsonEntry.name);
+    const jsonText = await jsonEntry.async('text');
+    // JSON文字列をパースしてオブジェクトに変換
+    const jsonObject = JSON.parse(jsonText);
+    testCases = jsonObject.testCases;
+    
+    // 問題pdfファイル取得
+    pdfEntry = jsZip.file('problem.pdf');
+    pdfData = await pdfEntry.async('arraybuffer');
+    
+    console.log('zip読み込みおわり');
+
+    // const path = require('path');
+    // const json = loadJson('./problemInfo.json');
+    // testCases = json.testCases;
+    
+    // const pathName = path.join(__dirname,'../problem.pdf');
+    // showPdf(pathName);
+
+    initTestCasesView();
+
+    showPdfBlob(pdfData);
+
+    currentProblemFilePath = filePath;
+
+    // コンパイルボタン有効化
+    document.getElementById('buttonCompile').disabled = false;
+}
+
+/**
+ * テストケース表示を初期化する
+ */
+function initTestCasesView()
+{
+    document.getElementById('tests-count').innerText = 
+        `正解数: - / ${testCases.length}`;
+        
+    // 以前のテストケース結果を削除
+    const outputsContainer = document.getElementById('outputs-container');
+    while (outputsContainer.firstChild) {
+        outputsContainer.removeChild(outputsContainer.firstChild);
+    }
+}
+
+var testCases;
+var pdfData;
+var currentProblemFilePath;
+
+/**
  * コンパイル・実行ボタンのコールバック
  */
 document.getElementById('buttonCompile').addEventListener('click', async (e) => {
     // ボタンを無効化
     buttonCompile.disabled = true;
+    buttonCompile.innerText = '実行中…';
+    document.getElementById('select-problem-button').disabled = true;
+    document.getElementById('select-json-button').disabled = true;
+    
+    if (currentProblemFilePath == null)
+    {
+        return;
+    }
 
-    const testCases = [['100 200 300', '600\n'],
-    ['1 2 3', '6\n'],
-    ['10 20 30', '60\n'],
-    ['1000 2000 3000', '6000\n'],];
+    // 出力結果を表示するコンテナ
+    const outputsContainer = document.getElementById('outputs-container');
+
+    initTestCasesView();
 
     var currentCaseCnt = 1;
-    await testCases.forEach(async function (testCase) {
-
+    var collectCasesCnt = 0;
+    for (const testCase of testCases)
+    {
         var id;     // コンパイル・実行のリクエストID
-        const input = testCase[0];    // 標準入力
-        const except = testCase[1];           // 期待する標準出力
-        // 以前のPDFを削除
-        const outputsContainer = document.getElementById('outputs-container');
-        while (outputsContainer.firstChild) {
-            outputsContainer.removeChild(outputsContainer.firstChild);
-        }
+        const input = testCase.input;   // 標準入力
+        const except = testCase.except; // 期待する標準出力
 
         //-----------------------------
         // コンパイル・実行のリクエスト
@@ -137,6 +217,11 @@ document.getElementById('buttonCompile').addEventListener('click', async (e) => 
 
             var isCollect = responseData.build_result == 'success' && responseData.stdout == except;
 
+            if (isCollect)
+            {
+                collectCasesCnt++;
+            }
+
             // 出力結果を表示
             const outputElement = document.createElement('div');
             outputElement.style.border = 'solid 1px #ccc';
@@ -151,11 +236,16 @@ document.getElementById('buttonCompile').addEventListener('click', async (e) => 
             
             currentCaseCnt++;
         })();
-
-    });
+    }
 
     // ボタンを有効化
     buttonCompile.disabled = false;
+    buttonCompile.innerText = 'コンパイル・実行';
+    document.getElementById('select-problem-button').disabled = false;
+    document.getElementById('select-json-button').disabled = false;
+
+    var isCollectAll = collectCasesCnt >= currentCaseCnt - 1;
+    document.getElementById('tests-count').innerText = `正解数: ${collectCasesCnt} / ${currentCaseCnt - 1} ・・・ ${isCollectAll ? '合格！' : '不合格…'}`;
 });
 
 
@@ -188,7 +278,8 @@ function showPdf(pdfPath) {
     while (pdfContainer.firstChild) {
         pdfContainer.removeChild(pdfContainer.firstChild);
     }
-    // 新たにiframe要素を作成、表示する
+        console.log(pdfPath);
+        // 新たにiframe要素を作成、表示する
     const iframe = document.createElement('iframe');
     iframe.src = `file://${pdfPath}#view=FitH&toolbar=0&navpanes=0`;
     iframe.width = '100%';
@@ -198,3 +289,64 @@ function showPdf(pdfPath) {
 
     pdfContainer.appendChild(iframe);
 }
+
+/**
+ * PDFをバイナリから読み込んで表示
+ * @param {*} pdfData PDFのバイナリデータ
+ */
+function showPdfBlob(pdfData) {
+    // 以前のPDFを削除
+    const pdfContainer = document.getElementById('pdf-container');
+    while (pdfContainer.firstChild) {
+        pdfContainer.removeChild(pdfContainer.firstChild);
+    }
+    
+    // 新たにiframe要素を作成、表示する
+    const iframe = document.createElement('iframe');
+    iframe.src = `${URL.createObjectURL(new Blob([pdfData], { type: 'application/pdf' }))}#view=FitH&toolbar=0&navpanes=0`;
+    iframe.width = '100%';
+    iframe.height = '900px';
+    iframe.border = 'none';
+    iframe.style.border = 'none';
+
+    pdfContainer.appendChild(iframe);
+}
+
+/**
+ * 問題zip読み込みボタン
+ */
+document.getElementById('select-problem-button').addEventListener('click', async (e) => {
+    ipcRenderer.send('show-open-problem-dialog');
+});
+
+/**
+ * メインプロセスからの問題zipパス受信
+ */
+ipcRenderer.on('problem-selected', async (event, zipPath) => {
+    await loadProblem(zipPath);
+});
+
+
+/**
+ * json読み込みボタン
+ */
+document.getElementById('select-json-button').addEventListener('click', async (e) => {
+    ipcRenderer.send('show-open-json-dialog');
+});
+
+/**
+ * メインプロセスからのjsonパス受信
+ */
+ipcRenderer.on('json-selected', async (event, jsonPath) => {
+    var json = loadJson(jsonPath);
+    if (json == null || json.testCases == null || json.testCases.length == 0)
+    {
+        return;
+    }
+    testCases = json.testCases;
+    initTestCasesView();
+    
+    // コンパイルボタン有効化
+    document.getElementById('buttonCompile').disabled = false;
+});
+

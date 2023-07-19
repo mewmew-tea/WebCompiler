@@ -17,18 +17,24 @@
 		<div class="row">
 			<div class="col-5">
 
-				<button id="select-pdf-button">Select PDF</button>
+				<button id="select-problem-button">問題を開く</button>
+				【作問者用→】
+				<button id="select-pdf-button">PDFを選択</button>
+				<button id="select-json-button">Jsonを選択</button>
 				<div id="pdf-container"></div>
 			</div>
 
 			<div class="col-7" style="display: flex;">
 				<div class="container">
 
-					<button id="buttonCompile" class="btn btn-success">
+					<button id="buttonCompile" class="btn btn-primary" type="submit" disabled="true">
 						コンパイル・実行
 					</button>
 					<div id="monaco-container"
 						style="font-size: 24px; min-width: 900px; width:auto; height: 600px; border: 1px solid #ccc">
+					</div>
+					
+					<div id="tests-count" style="font-size: 26px;">
 					</div>
 
 					<div id="outputs-container" class="overflow-auto" style="font-size: 24px; height:300px;">

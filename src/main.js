@@ -49,6 +49,42 @@ ipcMain.on('show-open-pdf-dialog', (event, arg) => {
 		});
 });
 
+// zip選択ダイアログの表示イベントの登録
+ipcMain.on('show-open-problem-dialog', (event, arg) => {
+	dialog.showOpenDialog(mainWindow, {
+		properties: ['openFile'],
+		filters: [{ name: 'Problem zip Files', extensions: ['zip'] }],
+	})
+		.then((result) => {
+			if (!result.canceled) {
+				const zipPath = result.filePaths[0];
+
+				console.log(zipPath);
+
+				// レンダラープロセスにパスを送信
+				mainWindow.webContents.send('problem-selected', zipPath);
+			}
+		});
+});
+
+// json選択ダイアログの表示イベントの登録
+ipcMain.on('show-open-json-dialog', (event, arg) => {
+	dialog.showOpenDialog(mainWindow, {
+		properties: ['openFile'],
+		filters: [{ name: 'Problem json Files', extensions: ['json'] }],
+	})
+		.then((result) => {
+			if (!result.canceled) {
+				const jsonPath = result.filePaths[0];
+
+				console.log(jsonPath);
+
+				// レンダラープロセスにパスを送信
+				mainWindow.webContents.send('json-selected', jsonPath);
+			}
+		});
+});
+
 app.on('ready', createWindow);
 
 app.on('window-all-closed', function () {
