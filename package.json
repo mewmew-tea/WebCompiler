@@ -1,0 +1,30 @@
+{
+  "name": "webcompiler",
+  "version": "1.0.0",
+  "description": "",
+  "main": "src/main.js",
+  "scripts": {
+    "start": "electron src/main.js",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/mewmew-tea/WebCompiler.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/mewmew-tea/WebCompiler/issues"
+  },
+  "homepage": "https://github.com/mewmew-tea/WebCompiler#readme",
+  "devDependencies": {
+    "electron": "^25.2.0",
+    "electron-builder": "^22.11.7"
+  },
+  "dependencies": {
+    "bootstrap": "^5.2.2",
+    "monaco-editor": "^0.34.1",
+    "monaco-editor-electron": "^1.0.6"
+  }
+}

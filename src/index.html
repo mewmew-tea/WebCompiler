@@ -1,0 +1,48 @@
+<!DOCTYPE html>
+<html lang="ja">
+
+<head>
+	<meta charset="UTF-8" />
+	<title>OnlineCompiler</title>
+	<link rel="stylesheet" href="../node_modules/bootstrap/dist/css/bootstrap.css">
+</head>
+
+<body>
+	
+	<div class="container" style="padding: 6px 0px 2px 0px; max-width: 95%;">
+
+		<h1>Online C++ compiler</h1>
+		※コンパイル・実行はオンライン上で実行されるため、インターネット環境が必須です。
+		<br>
+		<div class="row">
+			<div class="col-5">
+
+				<button id="select-pdf-button">Select PDF</button>
+				<div id="pdf-container"></div>
+			</div>
+
+			<div class="col-7" style="display: flex;">
+				<div class="container">
+
+					<button id="buttonCompile" class="btn btn-success">
+						コンパイル・実行
+					</button>
+					<div id="monaco-container"
+						style="font-size: 24px; min-width: 900px; width:auto; height: 600px; border: 1px solid #ccc">
+					</div>
+
+
+					<div id="output" style="font-size: 24px; height: 300px; border: 1px solid #ccc">
+						stdin: <br>
+						stdout:
+					</div>
+				</div>
+			</div>
+		</div>
+	</div>
+
+</body>
+
+<script src="index.js"></script>
+
+</html>
