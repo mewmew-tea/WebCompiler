@@ -140,16 +140,17 @@ var currentProblemFilePath;
  * コンパイル・実行ボタンのコールバック
  */
 document.getElementById('buttonCompile').addEventListener('click', async (e) => {
+    
+    if (testCases == null || testCases.length == 0)
+    {
+        return;
+    }
+    
     // ボタンを無効化
     buttonCompile.disabled = true;
     buttonCompile.innerText = '実行中…';
     document.getElementById('select-problem-button').disabled = true;
     document.getElementById('select-json-button').disabled = true;
-    
-    if (currentProblemFilePath == null)
-    {
-        return;
-    }
 
     // 出力結果を表示するコンテナ
     const outputsContainer = document.getElementById('outputs-container');
