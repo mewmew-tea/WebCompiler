@@ -152,6 +152,28 @@ document.getElementById('buttonCompile').addEventListener('click', async (e) => 
     document.getElementById('select-problem-button').disabled = true;
     document.getElementById('select-json-button').disabled = true;
 
+    // 実行
+    switch (compilerService)
+    {
+        case 'Wandbox':
+            await runWithWandbox();
+            break;
+        case 'Paiza.IO':
+            await runWithPaizaIO();
+            break;
+    }
+
+    // ボタンを有効化
+    buttonCompile.disabled = false;
+    buttonCompile.innerText = 'コンパイル・実行';
+    document.getElementById('select-problem-button').disabled = false;
+    document.getElementById('select-json-button').disabled = false;
+});
+
+/**
+ * コンパイル・実行（Paiza.IO）
+ */
+async function runWithPaizaIO() {
     // 出力結果を表示するコンテナ
     const outputsContainer = document.getElementById('outputs-container');
 
@@ -159,8 +181,7 @@ document.getElementById('buttonCompile').addEventListener('click', async (e) => 
 
     var currentCaseCnt = 1;
     var collectCasesCnt = 0;
-    for (const testCase of testCases)
-    {
+    for (const testCase of testCases) {
         var id;     // コンパイル・実行のリクエストID
         const input = testCase.input;   // 標準入力
         const except = testCase.except; // 期待する標準出力
@@ -218,14 +239,17 @@ document.getElementById('buttonCompile').addEventListener('click', async (e) => 
 
             var isCollect = responseData.build_result == 'success' && responseData.stdout == except;
 
-            if (isCollect)
-            {
+            if (isCollect) {
                 collectCasesCnt++;
             }
 
             // 出力結果を表示
+
+            var successColor = '#5cc991';
+            var failColor = '#f88070';
+
             const outputElement = document.createElement('div');
-            outputElement.style.border = 'solid 1px #ccc';
+            outputElement.style.border = `solid 4px ${isCollect ? successColor : failColor}`;
             outputElement.innerText =
                 `【テストケース${currentCaseCnt}】${isCollect ? '正解！' : '不正解…'}
 （ビルド結果: ${responseData.build_result} ${buildErrorMsg} ）
@@ -234,21 +258,96 @@ document.getElementById('buttonCompile').addEventListener('click', async (e) => 
 期待する出力: ${except}`;
 
             outputsContainer.appendChild(outputElement);
-            
+
             currentCaseCnt++;
         })();
     }
 
-    // ボタンを有効化
-    buttonCompile.disabled = false;
-    buttonCompile.innerText = 'コンパイル・実行';
-    document.getElementById('select-problem-button').disabled = false;
-    document.getElementById('select-json-button').disabled = false;
-
     var isCollectAll = collectCasesCnt >= currentCaseCnt - 1;
-    document.getElementById('tests-count').innerText = `正解数: ${collectCasesCnt} / ${currentCaseCnt - 1} ・・・ ${isCollectAll ? '合格！' : '不合格…'}`;
-});
+    document.getElementById('tests-count').innerHTML = `正解数: ${collectCasesCnt} / ${currentCaseCnt - 1} ・・・ ${
+        isCollectAll ? '<b><font color=#20c36f>合格！</font></b>' : '<b><font color=#e9604d>不合格…</font></b>'}`;    
+}
 
+/**
+ * コンパイル・実行（Wandbox）
+ */
+async function runWithWandbox() {
+    // 出力結果を表示するコンテナ
+    const outputsContainer = document.getElementById('outputs-container');
+
+    initTestCasesView();
+
+    var currentCaseCnt = 1;
+    var collectCasesCnt = 0;
+    for (const testCase of testCases) 
+    {
+        var id;     // コンパイル・実行のリクエストID
+        const input = testCase.input;   // 標準入力
+        const except = testCase.except; // 期待する標準出力
+
+        //-----------------------------
+        // コンパイル・実行のリクエスト
+        //-----------------------------
+        // ※無名関数を即時実行して、変数名被りを防ぐ（C++でスコープ使うのと同じ目的）
+        await (async () => {
+            const url = 'https://wandbox.org/api/compile.json';
+
+            console.log(editor.getModel().getValue());
+
+            const data = {
+                'code': editor.getModel().getValue(),
+                'compiler': 'gcc-head',
+                'options': '-std=gnu++2b',
+                'stdin': input,
+            };
+
+            // コンパイル・実行
+            // ソースコードやコマンドライン引数などの情報を送信
+            const response = await fetch(url, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify(data)
+            });
+            // if (response.ok) {
+            //     console.log("正常です");
+            // }
+            const responseData = await response.json();
+
+            var buildErrorMsg = responseData.compiler_error;
+
+            var successBuild = responseData.status == '0';
+
+            var isCollect = successBuild && responseData.program_output == except;
+
+            if (isCollect) {
+                collectCasesCnt++;
+            }
+
+            var successColor = '#5cc991';
+            var failColor = '#f88070';
+
+            // 出力結果を表示
+            const outputElement = document.createElement('div');
+            outputElement.style.border = `solid 4px ${isCollect ? successColor : failColor}`;
+            outputElement.innerText =
+                `【テストケース${currentCaseCnt}】${isCollect ? '正解！' : '不正解…'}
+（${successBuild ? 'ビルド成功' :  'ビルド失敗'}:  ${buildErrorMsg} ）
+標準入力: ${input}
+標準出力: ${responseData.program_output}
+期待する出力: ${except}`;
+
+            outputsContainer.appendChild(outputElement);
+
+            currentCaseCnt++;
+        })();
+    }
+    
+    var isCollectAll = collectCasesCnt >= currentCaseCnt - 1;
+    document.getElementById('tests-count').innerHTML = `正解数: ${collectCasesCnt} / ${currentCaseCnt - 1} ・・・ ${
+        isCollectAll ? '<b><font color=#20c36f>合格！</font></b>' : '<b><font color=#e9604d>不合格…</font></b>'}`;    
+}
 
 /**
  * PDF読み込みボタン
@@ -306,7 +405,7 @@ function showPdfBlob(pdfData) {
     const iframe = document.createElement('iframe');
     iframe.src = `${URL.createObjectURL(new Blob([pdfData], { type: 'application/pdf' }))}#view=FitH&toolbar=0&navpanes=0`;
     iframe.width = '100%';
-    iframe.height = '900px';
+    iframe.height = '800px';
     iframe.border = 'none';
     iframe.style.border = 'none';
 
@@ -349,5 +448,15 @@ ipcRenderer.on('json-selected', async (event, jsonPath) => {
     
     // コンパイルボタン有効化
     document.getElementById('buttonCompile').disabled = false;
+});
+
+
+
+/**
+ * selectで選択したコンパイラに応じてコンパイラ切り替え
+*/
+var compilerService = 'Wandbox';
+document.getElementById('compilerServiceSelect').addEventListener('change', async (e) => {
+    compilerService = e.target.value;
 });
 

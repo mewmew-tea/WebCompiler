@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="ja">
+<html lang="ja" data-bs-theme="dark">
 
 <head>
 	<meta charset="UTF-8" />
@@ -11,33 +11,53 @@
 	
 	<div class="container" style="padding: 6px 0px 2px 0px; max-width: 95%;">
 
-		<h1>Online C++ compiler</h1>
-		※コンパイル・実行はオンライン上で実行されるため、インターネット環境が必須です。
-		<br>
+		<p><h1>Online C++ compiler</h1></p>
+		<!-- <p>
+			※コンパイル・実行はオンライン上で実行されるため、インターネット環境が必須です。
+		</p> -->
+		
+		<hr style="border-top: 3px solid;">
+
 		<div class="row">
 			<div class="col-5">
-
-				<button id="select-problem-button">問題を開く</button>
+			<p>
+				<button id="select-problem-button" class="btn btn-primary">問題を開く</button>
 				【作問者用→】
-				<button id="select-pdf-button">PDFを選択</button>
-				<button id="select-json-button">Jsonを選択</button>
-				<div id="pdf-container"></div>
+				<button id="select-pdf-button" class="btn btn-secondary">PDFを選択</button>
+				<button id="select-json-button" class="btn btn-secondary">Jsonを選択</button>
+			</p>
+				<div id="pdf-container">＜問題を開いてください＞</div>
 			</div>
 
 			<div class="col-7" style="display: flex;">
 				<div class="container">
+					<p>
+
+					<div class="row">
+					<div class="col-auto">
 
 					<button id="buttonCompile" class="btn btn-primary" type="submit" disabled="true">
 						コンパイル・実行
 					</button>
+					</div>
+					<div class="col-auto">
+						<select class="form-select" id="compilerServiceSelect">
+						<option selected>Wandbox</option>
+						<option>Paiza.IO</option>
+					</select>
+					</div>
+					</div>
+					
+					</p>
+
 					<div id="monaco-container"
-						style="font-size: 24px; min-width: 900px; width:auto; height: 600px; border: 1px solid #ccc">
+						style="font-size: 24px; min-width: 400px; width:auto; height: 450px; border: 1px solid #ccc">
 					</div>
 					
 					<div id="tests-count" style="font-size: 26px;">
 					</div>
 
-					<div id="outputs-container" class="overflow-auto" style="font-size: 24px; height:300px;">
+					<div id="outputs-container" class="overflow-auto" style="font-size: 24px; height:280px;">
 						<!-- <div id="output" style="font-size: 24px; height: 300px; border: 1px solid #ccc">
 							stdin: <br>
 							stdout:
