@@ -184,7 +184,7 @@ async function runWithPaizaIO() {
     for (const testCase of testCases) {
         var id;     // コンパイル・実行のリクエストID
         const input = testCase.input;   // 標準入力
-        const except = testCase.except; // 期待する標準出力
+        const expect = testCase.expect; // 期待する標準出力
 
         //-----------------------------
         // コンパイル・実行のリクエスト
@@ -237,7 +237,7 @@ async function runWithPaizaIO() {
 
             var buildErrorMsg = responseData.build_stderr;
 
-            var isCollect = responseData.build_result == 'success' && responseData.stdout == except;
+            var isCollect = responseData.build_result == 'success' && responseData.stdout == expect;
 
             if (isCollect) {
                 collectCasesCnt++;
@@ -255,7 +255,7 @@ async function runWithPaizaIO() {
 （ビルド結果: ${responseData.build_result} ${buildErrorMsg} ）
 標準入力: ${input}
 標準出力: ${responseData.stdout}
-期待する出力: ${except}`;
+期待する出力: ${expect}`;
 
             outputsContainer.appendChild(outputElement);
 
@@ -283,7 +283,7 @@ async function runWithWandbox() {
     {
         var id;     // コンパイル・実行のリクエストID
         const input = testCase.input;   // 標準入力
-        const except = testCase.except; // 期待する標準出力
+        const expect = testCase.expect; // 期待する標準出力
 
         //-----------------------------
         // コンパイル・実行のリクエスト
@@ -319,7 +319,7 @@ async function runWithWandbox() {
 
             var successBuild = responseData.status == '0';
 
-            var isCollect = successBuild && responseData.program_output == except;
+            var isCollect = successBuild && responseData.program_output == expect;
 
             if (isCollect) {
                 collectCasesCnt++;
@@ -336,7 +336,7 @@ async function runWithWandbox() {
 （${successBuild ? 'ビルド成功' :  'ビルド失敗'}:  ${buildErrorMsg} ）
 標準入力: ${input}
 標準出力: ${responseData.program_output}
-期待する出力: ${except}`;
+期待する出力: ${expect}`;
 
             outputsContainer.appendChild(outputElement);
 
