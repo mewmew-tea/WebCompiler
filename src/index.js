@@ -270,6 +270,9 @@ async function runWithPaizaIO() {
 
 /**
  * コンパイル・実行（Wandbox）
+ * APIリファレンス：https://github.com/melpon/wandbox/blob/master/kennel/API.md
+ * 型情報：https://github.com/melpon/wandbox/blob/master/proto/kennel.proto
+ * コンパイラ情報：https://wandbox.org/api/list.json
  */
 async function runWithWandbox() {
     // 出力結果を表示するコンテナ
@@ -281,7 +284,6 @@ async function runWithWandbox() {
     var collectCasesCnt = 0;
     for (const testCase of testCases) 
     {
-        var id;     // コンパイル・実行のリクエストID
         const input = testCase.input;   // 標準入力
         const expect = testCase.expect; // 期待する標準出力
 
@@ -297,7 +299,7 @@ async function runWithWandbox() {
             const data = {
                 'code': editor.getModel().getValue(),
                 'compiler': 'gcc-head',
-                'options': '-std=gnu++2b',
+                'options': '-std=c++2a',    // C++20、GNU拡張なし。バージョン変えたければ、ここを変えればよい。
                 'stdin': input,
             };
 
