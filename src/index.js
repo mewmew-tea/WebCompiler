@@ -4,8 +4,8 @@
 // ダイアログ表示やファイル操作をしたい場合は、メインプロセスにイベントを送信する。(main.jsのipcMain.on()などで定義)
 
 // monaco-editor（コードエディタ）の読み込み＆表示
+// inspired by https://github.com/juanpahv/codexl
 var editor;
-
 
 function uriFromPath(_path) {
     const path = require('path');
@@ -18,7 +18,6 @@ function uriFromPath(_path) {
 }
 // ※無名関数を即時実行して、変数名被りを防ぐ（C++でスコープ使うのと同じ目的）
 (function () {
-    // inspired by https://github.com/juanpahv/codexl
     const path = require('path');
     const amdLoader = require('../node_modules/monaco-editor/min/vs/loader.js');
     const amdRequire = amdLoader.require;
@@ -252,10 +251,13 @@ async function runWithPaizaIO() {
             outputElement.style.border = `solid 4px ${isCollect ? successColor : failColor}`;
             outputElement.innerText =
                 `【テストケース${currentCaseCnt}】${isCollect ? '正解！' : '不正解…'}
-（ビルド結果: ${responseData.build_result} ${buildErrorMsg} ）
-標準入力: ${input}
-標準出力: ${responseData.stdout}
-期待する出力: ${expect}`;
+（ビルド結果: ${responseData.build_result}: ${buildErrorMsg} ）
+・標準入力
+${input}
+・標準出力
+${responseData.stdout}
+・期待する出力
+${expect}`;
 
             outputsContainer.appendChild(outputElement);
 
@@ -299,7 +301,10 @@ async function runWithWandbox() {
             const data = {
                 'code': editor.getModel().getValue(),
                 'compiler': 'gcc-head',
-                'options': '-std=c++2a',    // C++20、GNU拡張なし。バージョン変えたければ、ここを変えればよい。
+                'options': '-std=c++20',    // C++20、GNU拡張なし。
+                                            // バージョン変えたければ、ここを変えればよい。
+                                            // 例：C++23なら、-std=c++23。（詳細：https://gcc.gnu.org/onlinedocs/gcc/C-Dialect-Options.html）
+                                            // GNU拡張（例：-std=gnu++23）は、C++で出来るはずのない書き方出来て学習の妨げになるので使わない。
                 'stdin': input,
             };
 
@@ -336,9 +341,12 @@ async function runWithWandbox() {
             outputElement.innerText =
                 `【テストケース${currentCaseCnt}】${isCollect ? '正解！' : '不正解…'}
 （${successBuild ? 'ビルド成功' :  'ビルド失敗'}:  ${buildErrorMsg} ）
-標準入力: ${input}
-標準出力: ${responseData.program_output}
-期待する出力: ${expect}`;
+・標準入力
+${input}
+・標準出力
+${responseData.program_output}
+・期待する出力
+${expect}`;
 
             outputsContainer.appendChild(outputElement);
 
