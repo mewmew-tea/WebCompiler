@@ -1,19 +1,29 @@
+# Online C++ Compiler(Powered by Wandbox and Paiza.IO)
 
-## How to setup
+## How to Build
+
+### Requirements
+
+- git
+- Node.js v18.13.0
+
+### Clone and setup
 
 ```
 git clone https://github.com/mewmew-tea/WebCompiler.git
 cd WebCompiler
-// Electronのセットアップを書く
+npm install
 ```
 
-## How to run
+### Run the application
 
 ```
 npm run start
 ```
 
-## How to build executable
+### Build executable
+
+Windows(x64)
 
 ```
 npx electron-builder --win --x64 --dir
