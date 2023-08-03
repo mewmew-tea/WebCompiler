@@ -3,61 +3,61 @@
 
 <head>
 	<meta charset="UTF-8" />
-	<title>OnlineCompiler</title>
+	<title>Online C++ compiler - Version 1.0</title>
 	<link rel="stylesheet" href="../node_modules/bootstrap/dist/css/bootstrap.css">
 </head>
 
 <body>
-	
+
 	<div class="container" style="padding: 6px 0px 2px 0px; max-width: 95%;">
 
-		<p><h1>Online C++ compiler</h1></p>
+		<p>
+		<h1>Online C++ compiler - Version 1.0</h1>
+		</p>
 		<!-- <p>
 			※コンパイル・実行はオンライン上で実行されるため、インターネット環境が必須です。
 		</p> -->
-		
+
 		<hr style="border-top: 3px solid;">
 
 		<div class="row">
 			<div class="col-5">
-			<p>
-				<button id="select-problem-button" class="btn btn-primary">問題を開く</button>
-				【作問者用→】
-				<button id="select-pdf-button" class="btn btn-secondary">PDFを選択</button>
-				<button id="select-json-button" class="btn btn-secondary">Jsonを選択</button>
-			</p>
+				<p>
+					<button id="select-problem-button" class="btn btn-primary">問題を開く</button>
+					【作問者用→】
+					<button id="select-pdf-button" class="btn btn-secondary">PDFを選択</button>
+					<button id="select-json-button" class="btn btn-secondary">Jsonを選択</button>
+				</p>
 				<div id="pdf-container">＜問題を開いてください＞</div>
 			</div>
 
 			<div class="col-7" style="display: flex;">
 				<div class="container">
-					<p>
-
 					<div class="row">
-					<div class="col-auto">
 
-					<button id="buttonCompile" class="btn btn-primary" type="submit" disabled="true">
-						コンパイル・実行
-					</button>
+						<div class="col-auto">
+							<button id="buttonCompile" class="btn btn-primary" type="submit" disabled="true">
+								コンパイル・実行
+							</button>
+						</div>
+						<div class="col-auto">
+							<select class="form-select" id="compilerServiceSelect">
+								<option selected>Wandbox</option>
+								<option>Paiza.IO</option>
+							</select>
+						</div>
 					</div>
-					<div class="col-auto">
-						<select class="form-select" id="compilerServiceSelect">
-						<option selected>Wandbox</option>
-						<option>Paiza.IO</option>
-					</select>
-					</div>
-					</div>
-					
-					</p>
 
+					<p>
 					<div id="monaco-container"
 						style="font-size: 24px; min-width: 400px; width:auto; height: 450px; border: 1px solid #ccc">
 					</div>
-					
+					</p>
+
 					<div id="tests-count" style="font-size: 26px;">
 					</div>
 
-					<div id="outputs-container" class="overflow-auto" style="font-size: 24px; height:280px;">
+					<div id="outputs-container" class="overflow-auto" style="font-size: 18px; height:295px;">
 						<!-- <div id="output" style="font-size: 24px; height: 300px; border: 1px solid #ccc">
 							stdin: <br>
 							stdout:
