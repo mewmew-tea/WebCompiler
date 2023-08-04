@@ -7,6 +7,27 @@
 // inspired by https://github.com/juanpahv/codexl
 var editor;
 
+var initialCode = 
+`#include <iostream>
+using namespace std;
+
+int main() {
+	cout << "Hello World!" << endl;
+	return 0;
+}`;
+/*'#include <iostream>\n\
+using namespace std;\n\
+\n\
+int main()\n\
+{\n\
+    int a, b, c;\n\
+    cin >> a >> b >> c;\n\
+    \n\
+    int sum = a + b + c;\n\
+    cout << sum << endl;\n\
+    return 0;\n\
+}'*/
+
 function uriFromPath(_path) {
     const path = require('path');
     var pathName = path.resolve(_path).replace(/\\/g, '/');
@@ -27,20 +48,7 @@ function uriFromPath(_path) {
     self.module = undefined;
     amdRequire(['vs/editor/editor.main'], function () {
         editor = monaco.editor.create(document.getElementById('monaco-container'), {
-            value: [
-                '#include <iostream>\n\
-using namespace std;\n\
-\n\
-int main()\n\
-{\n\
-    int a, b, c;\n\
-    cin >> a >> b >> c;\n\
-    \n\
-    int sum = a + b + c;\n\
-    cout << sum << endl;\n\
-    return 0;\n\
-}'
-            ].join('\n'),
+            value: initialCode,
             language: 'cpp',
             // automaticLayout: true,
             theme: "vs-dark",
@@ -48,6 +56,10 @@ int main()\n\
         });
     });
 })();
+
+function setCodeToEditor(code) {
+    editor.getModel().setValue(code);
+}
 
 const { ipcRenderer } = require("electron");
 
@@ -74,14 +86,14 @@ function loadJson(jsonPath)
 
 /**
  * 問題をロードする
- * @param {*} filePath 問題zipファイルのパス
+ * @param {*} filePath 問題ファイルのパス
  */
 async function loadProblem(filePath)
 {
     const fsPromises = require('fs').promises;
     const JSZip = require('jszip');
 
-    console.log('zip読み込み');
+    console.log('prob読み込み');
     const buffer = await fsPromises.readFile(filePath);
     const jsZip = await JSZip.loadAsync(buffer);
     
@@ -97,7 +109,7 @@ async function loadProblem(filePath)
     pdfEntry = jsZip.file('problem.pdf');
     pdfData = await pdfEntry.async('arraybuffer');
     
-    console.log('zip読み込みおわり');
+    console.log('prob読み込みおわり');
 
     // const path = require('path');
     // const json = loadJson('./problemInfo.json');
@@ -111,6 +123,9 @@ async function loadProblem(filePath)
     showPdfBlob(pdfData);
 
     currentProblemFilePath = filePath;
+
+    // コードを初期化
+    setCodeToEditor(initialCode);
 
     // コンパイルボタン有効化
     document.getElementById('buttonCompile').disabled = false;
@@ -180,6 +195,11 @@ async function runWithPaizaIO() {
 
     var currentCaseCnt = 1;
     var collectCasesCnt = 0;
+
+
+    // 結果を格納する配列
+    var results = [];
+
     for (const testCase of testCases) {
         var id;     // コンパイル・実行のリクエストID
         const input = testCase.input;   // 標準入力
@@ -252,11 +272,11 @@ async function runWithPaizaIO() {
             outputElement.innerText =
                 `【テストケース${currentCaseCnt}】${isCollect ? '正解！' : '不正解…'}
 （ビルド結果: ${responseData.build_result}: ${buildErrorMsg} ）
-・標準入力
+# 標準入力
 ${input}
-・標準出力
+# 標準出力
 ${responseData.stdout}
-・期待する出力
+# 期待する出力
 ${expect}`;
 
             outputsContainer.appendChild(outputElement);
@@ -341,11 +361,11 @@ async function runWithWandbox() {
             outputElement.innerText =
                 `【テストケース${currentCaseCnt}】${isCollect ? '正解！' : '不正解…'}
 （${successBuild ? 'ビルド成功' :  'ビルド失敗'}:  ${buildErrorMsg} ）
-・標準入力
+# 標準入力
 ${input}
-・標準出力
+# 標準出力
 ${responseData.program_output}
-・期待する出力
+# 期待する出力
 ${expect}`;
 
             outputsContainer.appendChild(outputElement);
@@ -423,17 +443,17 @@ function showPdfBlob(pdfData) {
 }
 
 /**
- * 問題zip読み込みボタン
+ * 問題読み込みボタン
  */
 document.getElementById('select-problem-button').addEventListener('click', async (e) => {
     ipcRenderer.send('show-open-problem-dialog');
 });
 
 /**
- * メインプロセスからの問題zipパス受信
+ * メインプロセスからの問題パス受信
  */
-ipcRenderer.on('problem-selected', async (event, zipPath) => {
-    await loadProblem(zipPath);
+ipcRenderer.on('problem-selected', async (event, probPath) => {
+    await loadProblem(probPath);
 });
 
 

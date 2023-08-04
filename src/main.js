@@ -49,20 +49,20 @@ ipcMain.on('show-open-pdf-dialog', (event, arg) => {
 		});
 });
 
-// zip選択ダイアログの表示イベントの登録
+// 問題選択ダイアログの表示イベントの登録
 ipcMain.on('show-open-problem-dialog', (event, arg) => {
 	dialog.showOpenDialog(mainWindow, {
 		properties: ['openFile'],
-		filters: [{ name: 'Problem zip Files', extensions: ['zip'] }],
+		filters: [{ name: 'Problem Files', extensions: ['prob'] }],
 	})
 		.then((result) => {
 			if (!result.canceled) {
-				const zipPath = result.filePaths[0];
+				const probPath = result.filePaths[0];
 
-				console.log(zipPath);
+				console.log(probPath);
 
 				// レンダラープロセスにパスを送信
-				mainWindow.webContents.send('problem-selected', zipPath);
+				mainWindow.webContents.send('problem-selected', probPath);
 			}
 		});
 });
