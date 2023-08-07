@@ -63,6 +63,45 @@ function setCodeToEditor(code) {
 
 const { ipcRenderer } = require("electron");
 
+
+let timerInterval = 0;
+let elapsedTime = 0;
+
+function startTimer() {
+  if (!timerInterval) {
+    const startTime = Date.now() - elapsedTime;
+    timerInterval = setInterval(updateTimer, 1000, startTime);
+  }
+}
+
+function stopTimer() {
+  if (timerInterval) {
+    clearInterval(timerInterval);
+    timerInterval = null;
+  }
+}
+
+function resetTimer() {
+  stopTimer();
+  elapsedTime = 0;
+  updateTimer(Date.now());
+}
+
+function updateTimer(startTime) {
+  const currentTime = Date.now();
+  elapsedTime = currentTime - startTime;
+  const formattedTime = formatTime(elapsedTime);
+  document.getElementById("timer").textContent = formattedTime;
+}
+
+function formatTime(timeInMillis) {
+  const padZero = (num) => (num < 10 ? `0${num}` : num);
+  const seconds = Math.floor(timeInMillis / 1000) % 60;
+  const minutes = Math.floor(timeInMillis / 1000 / 60) % 60;
+  const hours = Math.floor(timeInMillis / 1000 / 3600);
+  return `経過時間  ${padZero(hours)}:${padZero(minutes)}:${padZero(seconds)}`;
+}
+
 /**
  * 一定時間停止する（非同期処理）
  * @param {*} ms 停止する時間（ミリ秒）
@@ -119,6 +158,10 @@ async function loadProblem(filePath)
     // showPdf(pathName);
 
     initTestCasesView();
+
+    // タイマー開始
+    resetTimer();
+    startTimer();
 
     showPdfBlob(pdfData);
 
