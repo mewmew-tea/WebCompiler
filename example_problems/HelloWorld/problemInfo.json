@@ -1,0 +1,8 @@
+{
+  "testCases": [
+    {
+      "input": "Hello World!\n",
+      "expect": "Hello World!\n"
+    }
+  ]
+}
