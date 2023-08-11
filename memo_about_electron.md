@@ -11,7 +11,7 @@ Electronは、メインプロセス(main.js)とレンダラプロセス(index.ht
 （mainWindow.webContents.send）  
 
 
-## pdf読み込みボタンでの処理の流れ
+## 例：pdf読み込みボタンでの処理の流れ
 
 ※矢印の箇所でイベントが送信されてます。  
 
