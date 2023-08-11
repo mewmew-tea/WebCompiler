@@ -1,12 +1,15 @@
-// index.js：レンダラプロセス。HTMLによるGUIの表示を制御する。
-// おもに描画や、ボタンクリックなどのイベントを受け取りをする。
-// つまり、やってることはブラウザのJavaScriptとだいたい同じ。
-// ダイアログ表示やファイル操作をしたい場合は、メインプロセスにイベントを送信する。(main.jsのipcMain.on()などで定義)
+// index.js：レンダラプロセス。
+// おもにHTMLページのGUIの描画や、ボタンクリックなどのイベントを受け取りをする。
+
+const { ipcRenderer } = require("electron");
+
+//===================================================
+// コードエディタ
+//===================================================
 
 // monaco-editor（コードエディタ）の読み込み＆表示
 // inspired by https://github.com/juanpahv/codexl
 var editor;
-
 var initialCode = 
 `#include <iostream>
 using namespace std;
@@ -15,19 +18,12 @@ int main() {
 	cout << "Hello World!" << endl;
 	return 0;
 }`;
-/*'#include <iostream>\n\
-using namespace std;\n\
-\n\
-int main()\n\
-{\n\
-    int a, b, c;\n\
-    cin >> a >> b >> c;\n\
-    \n\
-    int sum = a + b + c;\n\
-    cout << sum << endl;\n\
-    return 0;\n\
-}'*/
 
+/**
+ * パスからURIを生成する
+ * @param {*} _path 
+ * @returns 
+ */
 function uriFromPath(_path) {
     const path = require('path');
     var pathName = path.resolve(_path).replace(/\\/g, '/');
@@ -37,7 +33,11 @@ function uriFromPath(_path) {
     console.log(pathName);
     return encodeURI('file://' + pathName);
 }
-// ※無名関数を即時実行して、変数名被りを防ぐ（C++でスコープ使うのと同じ目的）
+
+/**
+ * エディタの作成。初期化処理。
+ * ※無名関数を即時実行している。これにより変数名被りを防ぐ（C++でスコープ使うのと同じ目的）
+*/
 (function () {
     const path = require('path');
     const amdLoader = require('../node_modules/monaco-editor/min/vs/loader.js');
@@ -57,11 +57,17 @@ function uriFromPath(_path) {
     });
 })();
 
+/**
+ * エディタにコードをセットする
+ * @param {*} code セットするコード
+ */
 function setCodeToEditor(code) {
     editor.getModel().setValue(code);
 }
 
-const { ipcRenderer } = require("electron");
+//===================================================
+// タイマー
+//===================================================
 
 
 let timerInterval;
@@ -129,6 +135,10 @@ function sleep(ms) {
     return new Promise(resolve => setTimeout(resolve, ms));
 }
 
+//===================================================
+// 問題情報などの読み込み
+//===================================================
+
 /**
  * Jsonファイルを読み込む
  * @param {*} jsonPath 読み込みJsonファイルのパス
@@ -142,29 +152,21 @@ function loadJson(jsonPath)
 }
 
 /**
- * 問題をロードする
- * @param {*} filePath 問題ファイルのパス
+ * 問題情報を読み込む
+ * @param {*} jsonData jsonデータ
  */
-async function loadProblem(filePath)
+function readProblemInfoData(jsonData)
 {
-    const fsPromises = require('fs').promises;
-    const JSZip = require('jszip');
-
-    console.log('prob読み込み');
-    const buffer = await fsPromises.readFile(filePath);
-    const jsZip = await JSZip.loadAsync(buffer);
-    
-    // 問題情報jsonファイル取得
-    const jsonEntry = jsZip.file('problemInfo.json');
-    console.log(jsonEntry.name);
-    const jsonText = await jsonEntry.async('text');
-    // JSON文字列をパースしてオブジェクトに変換
-    const jsonObject = JSON.parse(jsonText);
-    testCases = jsonObject.testCases;
-    // 誤差許容
-    if (jsonObject.errorMargin != null)
+    if (jsonData == null || jsonData.testCases == null || jsonData.testCases.length == 0)
     {
-        errorMargin = jsonObject.errorMargin;
+        return false;
+    }
+
+    testCases = jsonData.testCases;
+    // 誤差許容
+    if (jsonData.errorMargin != null)
+    {
+        errorMargin = jsonData.errorMargin;
         isEnableErrorMargin = true;
     }
     else
@@ -172,45 +174,67 @@ async function loadProblem(filePath)
         errorMargin = 0.0;
         isEnableErrorMargin = false;
     }
-    
-    // 問題pdfファイル取得
-    pdfEntry = jsZip.file('problem.pdf');
-    pdfData = await pdfEntry.async('arraybuffer');
-    
-    console.log('prob読み込みおわり');
 
-    // const path = require('path');
-    // const json = loadJson('./problemInfo.json');
-    // testCases = json.testCases;
-    
-    // const pathName = path.join(__dirname,'../problem.pdf');
-    // showPdf(pathName);
-
-    initTestCasesView();
-
-    // タイマー開始
-    resetTimer();
-    startTimer();
-
-    showPdfBlob(pdfData);
-
-    currentProblemFilePath = filePath;
-
-    // コードを初期化
-    setCodeToEditor(initialCode);
-
-    // コンパイルボタン有効化
-    document.getElementById('buttonCompile').disabled = false;
+    return true;
 }
 
-var testCases;
-var pdfData;
-var currentProblemFilePath;
+/**
+ * 問題をロードする
+ * @param {*} filePath 問題ファイルのパス
+ */
+async function loadProblem(filePath)
+{
+    try {
+        // zipファイルを読み込む
+        const fsPromises = require('fs').promises;
+        const JSZip = require('jszip');
 
-// 許容する誤差
-let errorMargin = 0.0;
-// 誤差許容を有効にするか
-let isEnableErrorMargin = false;
+        const buffer = await fsPromises.readFile(filePath);
+        const jsZip = await JSZip.loadAsync(buffer);
+        
+        // 問題情報jsonファイル取得
+        const jsonEntry = jsZip.file('problemInfo.json');
+        console.log(jsonEntry.name);
+        // jsonファイルをテキストとして読み込み＆パース
+        const jsonText = await jsonEntry.async('text');
+        const jsonObject = JSON.parse(jsonText);
+        // 読み込み
+        if (readProblemInfoData(jsonObject) == false)
+        {
+            return false;
+        }
+        
+        // 問題pdfファイル取得
+        pdfEntry = jsZip.file('problem.pdf');
+        pdfData = await pdfEntry.async('arraybuffer');
+        console.log('prob読み込みおわり');
+        showPdfBlob(pdfData);
+        
+        // テストケース表示を初期化
+        initTestCasesView();
+
+        // タイマー開始
+        resetTimer();
+        startTimer();
+
+        // コードを初期化
+        setCodeToEditor(initialCode);
+
+        currentProblemFilePath = filePath;
+
+        // コンパイルボタン有効化
+        document.getElementById('buttonCompile').disabled = false;
+    } catch(e) {
+        console.log(e.message)
+        return false;
+    }
+
+    return true;
+}
+
+//===================================================
+// テストケースや結果の表示
+//===================================================
 
 /**
  * テストケース表示を初期化する
@@ -228,55 +252,92 @@ function initTestCasesView()
 }
 
 /**
- * コンパイル・実行ボタンのコールバック
+ * 実行結果から正解/不正解判定を行う
+ * @param {*} successBuild コンパイル成功したか
+ * @param {*} expect 期待する出力
+ * @param {*} stdout 標準出力
+ * @returns 
  */
-document.getElementById('buttonCompile').addEventListener('click', async (e) => {
-    
-    if (testCases == null || testCases.length == 0)
+function judgeResult(successBuild, expect, stdout)
+{
+    if (isEnableErrorMargin)
     {
-        return;
+        // スペース区切りで分割、すべての要素を数値に変換
+        const actual = stdout.split(' ').map(Number);
+        const expected = expect.split(' ').map(Number);
+        
+        // 誤差を許容して、期待する出力と一致するか判定。誤差は+-で許容する。
+        return successBuild && actual.every((v, i) => Math.abs(v - expected[i]) <= errorMargin);
     }
-    
-    // ボタンを無効化
-    buttonCompile.disabled = true;
-    buttonCompile.innerText = '実行中…';
-    document.getElementById('select-problem-button').disabled = true;
-    document.getElementById('select-json-button').disabled = true;
-
-    // 実行
-    switch (compilerService)
+    else
     {
-        case 'Wandbox':
-            await runWithWandbox();
-            break;
-        case 'Paiza.IO':
-            await runWithPaizaIO();
-            break;
+        return successBuild && stdout === expect;
+    }
+}
+
+/**
+ * コンパイルや実行などの結果を表示する
+ * @param {*} results 
+ */
+function showResults(results)
+{
+    // 出力結果を表示
+    const outputsContainer = document.getElementById('outputs-container');
+    let index = 1;
+    let collectCasesCnt = 0;
+    // テストケースごとに結果のHTML要素を作成
+    for (const result of results)
+    {
+        const outputElement = document.createElement('div');
+        // 成否によって枠の色を変える
+        outputElement.style.border = `solid 4px ${result.isCollect ? '#5cc991' : '#f88070'}`;
+        // テストケースごとの結果
+        outputElement.innerText =
+`【テストケース${index}】${result.isCollect ? '正解！' : '不正解…'} 
+（ビルド結果: ${result.successBuild ? '成功' : '失敗'}: ${result.buildErrorMsg} ）
+# 標準入力
+${result.stdin}
+# 標準出力
+${result.stdout}
+# 期待する出力
+${result.expect}
+# 標準エラー出力
+${result.stderr}`;
+
+        outputsContainer.appendChild(outputElement);
+
+        if (result.isCollect) {
+            collectCasesCnt++;
+        }
+        index++;
     }
 
-    // ボタンを有効化
-    buttonCompile.disabled = false;
-    buttonCompile.innerText = 'コンパイル・実行';
-    document.getElementById('select-problem-button').disabled = false;
-    document.getElementById('select-json-button').disabled = false;
-});
+    // 正答数と正答数を表示
+    var isCollectAll = collectCasesCnt >= testCases.length;
+    document.getElementById('tests-count').innerHTML = `正解数: ${collectCasesCnt} / ${testCases.length} ・・・ ${
+        isCollectAll ? '<b><font color=#20c36f>合格！</font></b>' : '<b><font color=#e9604d>不合格…</font></b>'}`;    
+}
+
+//===================================================
+// コンパイル・実行処理（テストケース実行を含む）
+//===================================================
+
+// コンパイル・実行をするサービス
+var compilerService = 'Wandbox';
 
 /**
  * コンパイル・実行（Paiza.IO）
  */
 async function runWithPaizaIO() {
-    // 出力結果を表示するコンテナ
-    const outputsContainer = document.getElementById('outputs-container');
-
+    // テストケース表示を初期化
     initTestCasesView();
-
-    let currentCaseCnt = 1;
-    let collectCasesCnt = 0;
     
-    const detailsResponses = await Promise.all(testCases.map(async (testCase) => {
+    // テストケースを並列して実行して、その結果をresultに格納する
+    const results = await Promise.all(testCases.map(async (testCase) => {
         const input = testCase.input;
         const expect = testCase.expect;
 
+        // 実行のリクエストをする
         const url = 'http://api.paiza.io/runners/create';
         const data = {
             'source_code': editor.getModel().getValue(),
@@ -296,65 +357,31 @@ async function runWithPaizaIO() {
         const responseData = await response.json();
         const id = responseData.id;
 
+        // 実行結果を取得する前に少し待つ
         await sleep(3000);
 
+        // 実行結果を取得する
         const detailsUrl = `http://api.paiza.io/runners/get_details?id=${id}&api_key=guest`;
-
         // リクエストを送信
         const detailsResponse = await fetch(detailsUrl);
-        return { response: detailsResponse, input, expect }; // オブジェクトを返す
+        const detailsData = await detailsResponse.json();
+
+        var successBuild = detailsData.build_result === 'success';
+
+        // 結果をオブジェクトとして返す（これでresultsのリストに格納される）
+        return {
+            isCollect: judgeResult(successBuild, expect, detailsData.stdout),
+            successBuild: successBuild,
+            buildErrorMsg: detailsData.build_stderr,
+            expect: expect,
+            stdin: input,
+            stdout: detailsData.stdout,
+            stderr: detailsData.stderr,
+        }
     }));
 
-    for (const details of detailsResponses) { // 各リクエストの結果を順番に処理
-        const detailsResponse = details.response;
-        const detailsData = await detailsResponse.json();
-        const input = details.input;
-        const expect = details.expect;
-
-        const buildErrorMsg = detailsData.build_stderr;
-        let isCollect = false;
-        
-        if (isEnableErrorMargin)
-        {
-            // スペース区切りで分割、すべての要素を数値に変換
-            const actual = detailsData.stdout.split(' ').map(Number);
-            const expected = expect.split(' ').map(Number);
-            
-            // 誤差を許容して、期待する出力と一致するか判定。誤差は+-で許容する。
-            isCollect = detailsData.build_result === 'success' && actual.every((v, i) => Math.abs(v - expected[i]) <= errorMargin);
-        }
-        else
-        {
-            isCollect = detailsData.build_result === 'success' && detailsData.stdout === expect;
-        }
-
-        if (isCollect) {
-            collectCasesCnt++;
-        }
-
-        const successColor = '#5cc991';
-        const failColor = '#f88070';
-
-        const outputElement = document.createElement('div');
-        outputElement.style.border = `solid 4px ${isCollect ? successColor : failColor}`;
-        outputElement.innerText =
-`【テストケース${currentCaseCnt}】${isCollect ? '正解！' : '不正解…'} 
-（ビルド結果: ${detailsData.build_result}: ${buildErrorMsg} ）
-# 標準入力
-${input}
-# 標準出力
-${detailsData.stdout}
-# 期待する出力
-${expect}`;
-
-        outputsContainer.appendChild(outputElement);
-
-        currentCaseCnt++;
-    }
-
-    var isCollectAll = collectCasesCnt >= currentCaseCnt - 1;
-    document.getElementById('tests-count').innerHTML = `正解数: ${collectCasesCnt} / ${currentCaseCnt - 1} ・・・ ${
-        isCollectAll ? '<b><font color=#20c36f>合格！</font></b>' : '<b><font color=#e9604d>不合格…</font></b>'}`;    
+    // 結果を表示
+    showResults(results);
 }
 
 /**
@@ -364,129 +391,58 @@ ${expect}`;
  * コンパイラ情報：https://wandbox.org/api/list.json
  */
 async function runWithWandbox() {
-    // 出力結果を表示するコンテナ
-    const outputsContainer = document.getElementById('outputs-container');
-
+    // テストケース表示を初期化
     initTestCasesView();
-
-    var currentCaseCnt = 1;
-    var collectCasesCnt = 0;
-    for (const testCase of testCases) 
-    {
-        const input = testCase.input;   // 標準入力
-        const expect = testCase.expect; // 期待する標準出力
-
-        //-----------------------------
-        // コンパイル・実行のリクエスト
-        //-----------------------------
-        // ※無名関数を即時実行して、変数名被りを防ぐ（C++でスコープ使うのと同じ目的）
-        await (async () => {
-            const url = 'https://wandbox.org/api/compile.json';
-
-            console.log(editor.getModel().getValue());
-
-            const data = {
-                'code': editor.getModel().getValue(),
-                'compiler': 'gcc-head',
-                'options': '-std=c++20',    // C++20、GNU拡張なし。
-                                            // バージョン変えたければ、ここを変えればよい。
-                                            // 例：C++23なら、-std=c++23。（詳細：https://gcc.gnu.org/onlinedocs/gcc/C-Dialect-Options.html）
-                                            // GNU拡張（例：-std=gnu++23）は、C++で出来るはずのない書き方出来て学習の妨げになるので使わない。
-                'stdin': input,
-            };
-
-            // コンパイル・実行
-            // ソースコードやコマンドライン引数などの情報を送信
-            const response = await fetch(url, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json'
-                },
-                body: JSON.stringify(data)
-            });
-            // if (response.ok) {
-            //     console.log("正常です");
-            // }
-            const responseData = await response.json();
-
-            var buildErrorMsg = responseData.compiler_error;
-
-            var successBuild = responseData.status == '0';
-
-            var isCollect = false;
-        
-            // 誤差許容
-            if (isEnableErrorMargin)
-            {
-                // スペース区切りで分割、すべての要素を数値に変換
-                const actual = responseData.program_output.split(' ').map(Number);
-                const expected = expect.split(' ').map(Number);
-
-                // 要素数が一致するか確認
-                if (actual.length != expected.length)
-                {
-                    isCollect = false;
-                }
-                else
-                {
-                    // 誤差を許容して、期待する出力と一致するか判定。誤差は+-で許容する。
-                    isCollect = successBuild && actual.every((v, i) => Math.abs(v - expected[i]) <= errorMargin);
-                }
-            }
-            else
-            {
-                isCollect = successBuild && responseData.program_output == expect;
-            }
-
-            if (isCollect) {
-                collectCasesCnt++;
-            }
-
-            var successColor = '#5cc991';
-            var failColor = '#f88070';
-
-            // 出力結果を表示
-            const outputElement = document.createElement('div');
-            outputElement.style.border = `solid 4px ${isCollect ? successColor : failColor}`;
-            outputElement.innerText =
-                `【テストケース${currentCaseCnt}】${isCollect ? '正解！' : '不正解…'}
-（${successBuild ? 'ビルド成功' :  'ビルド失敗'}:  ${buildErrorMsg} ）
-# 標準入力
-${input}
-# 標準出力
-${responseData.program_output}
-# 期待する出力
-${expect}`;
-
-            outputsContainer.appendChild(outputElement);
-
-            currentCaseCnt++;
-        })();
-    }
     
-    var isCollectAll = collectCasesCnt >= currentCaseCnt - 1;
-    document.getElementById('tests-count').innerHTML = `正解数: ${collectCasesCnt} / ${currentCaseCnt - 1} ・・・ ${
-        isCollectAll ? '<b><font color=#20c36f>合格！</font></b>' : '<b><font color=#e9604d>不合格…</font></b>'}`;    
+    // テストケースを並列して実行して、その結果をresultに格納する
+    const results = await Promise.all(testCases.map(async (testCase) => {
+        const input = testCase.input;
+        const expect = testCase.expect;
+        
+        // コンパイル・実行
+        const url = 'https://wandbox.org/api/compile.json';
+        const data = {
+            'code': editor.getModel().getValue(),
+            'compiler': 'gcc-head',
+            'options': '-std=c++20',    // C++20、GNU拡張なし。
+                                        // バージョン変えたければ、ここを変えればよい。
+                                        // 例：C++23なら、-std=c++23。（詳細：https://gcc.gnu.org/onlinedocs/gcc/C-Dialect-Options.html）
+                                        // GNU拡張（例：-std=gnu++23）は、C++で出来るはずのない書き方出来て学習の妨げになるので使わない。
+            'stdin': input,
+        };
+
+        // ソースコードやコマンドライン引数などの情報を送信
+        const response = await fetch(url, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify(data)
+        });
+        
+        const responseData = await response.json();
+
+        var successBuild = responseData.status == '0';
+
+        // 結果をオブジェクトとして返す（これでresultsのリストに格納される）
+        return {
+            isCollect: judgeResult(successBuild, expect, responseData.program_output),
+            successBuild: successBuild,
+            buildErrorMsg: responseData.compiler_error,
+            expect: expect,
+            stdin: input,
+            stdout: responseData.program_output,
+            stderr: responseData.program_error,
+        }
+    }));
+
+    // 結果を表示
+    showResults(results);
 }
 
-/**
- * PDF読み込みボタン
- * ボタン押す（select-pdf-buttonのclickイベント発火）
- *  -> show-open-pdf-dialogイベント発火（main.jsのipcMain.on('show-open-pdf-dialog')が実行）
- *  -> pdf-selectedイベント発火（ipcRenderer.on('pdf-selected'...)が実行）
- *  -> showPdf関数実行
- */
-document.getElementById('select-pdf-button').addEventListener('click', async (e) => {
-    ipcRenderer.send('show-open-pdf-dialog');
-});
-
-/**
- * メインプロセスからのPDFパス受信
- */
-ipcRenderer.on('pdf-selected', (event, pdfPath) => {
-    // 新しいPDFを表示
-    showPdf(pdfPath);
-});
+//===================================================
+// pdfファイル表示
+//===================================================
 
 /**
  * PDF表示
@@ -532,15 +488,34 @@ function showPdfBlob(pdfData) {
     pdfContainer.appendChild(iframe);
 }
 
+//===================================================
+// 各種コールバックのイベント登録
+//===================================================
+
 /**
- * 問題読み込みボタン
+ * PDF読み込みボタンのクリックイベント登録。html上のボタンを押したときに呼ばれる。
+ */
+document.getElementById('select-pdf-button').addEventListener('click', async (e) => {
+    ipcRenderer.send('show-open-pdf-dialog');
+});
+
+/**
+ * メインプロセスからのPDFパス受信のイベント登録
+ */
+ipcRenderer.on('pdf-selected', (event, pdfPath) => {
+    // 新しいPDFを表示
+    showPdf(pdfPath);
+});
+
+/**
+ * 問題読み込みボタンイベント登録。html上のボタンを押したときに呼ばれる。
  */
 document.getElementById('select-problem-button').addEventListener('click', async (e) => {
     ipcRenderer.send('show-open-problem-dialog');
 });
 
 /**
- * メインプロセスからの問題パス受信
+ * メインプロセスからの問題パス受信のイベント登録
  */
 ipcRenderer.on('problem-selected', async (event, probPath) => {
     await loadProblem(probPath);
@@ -548,34 +523,20 @@ ipcRenderer.on('problem-selected', async (event, probPath) => {
 
 
 /**
- * json読み込みボタン
+ * json読み込みボタンのクリックイベント登録。html上のボタンを押したときに呼ばれる。
  */
 document.getElementById('select-json-button').addEventListener('click', async (e) => {
     ipcRenderer.send('show-open-json-dialog');
 });
 
 /**
- * メインプロセスからのjsonパス受信
+ * メインプロセスからのjsonパス受信のイベント登録
  */
 ipcRenderer.on('json-selected', async (event, jsonPath) => {
     var json = loadJson(jsonPath);
-    if (json == null || json.testCases == null || json.testCases.length == 0)
-    {
-        return;
-    }
-    testCases = json.testCases;
-    // 誤差許容
-    // errorMarginがjosnにあるかどうか
-    if (json.errorMargin != null)
-    {
-        errorMargin = json.errorMargin;
-        isEnableErrorMargin = true;
-    }
-    else
-    {
-        errorMargin = 0.0;
-        isEnableErrorMargin = false;
-    }
+    
+    // 読み込み
+    readProblemInfoData(json);
     initTestCasesView();
     
     // コンパイルボタン有効化
@@ -583,11 +544,44 @@ ipcRenderer.on('json-selected', async (event, jsonPath) => {
 });
 
 
+/**
+ * コンパイル・実行ボタンのコールバック
+ */
+document.getElementById('buttonCompile').addEventListener('click', async (e) => {
+    
+    if (testCases == null || testCases.length == 0)
+    {
+        return;
+    }
+    
+    // ボタンを無効化
+    buttonCompile.disabled = true;
+    buttonCompile.innerText = '実行中…';
+    document.getElementById('select-problem-button').disabled = true;
+    document.getElementById('select-json-button').disabled = true;
+
+    // 実行
+    switch (compilerService)
+    {
+        case 'Wandbox':
+            await runWithWandbox();
+            break;
+        case 'Paiza.IO':
+            await runWithPaizaIO();
+            break;
+    }
+
+    // ボタンを有効化
+    buttonCompile.disabled = false;
+    buttonCompile.innerText = 'コンパイル・実行';
+    document.getElementById('select-problem-button').disabled = false;
+    document.getElementById('select-json-button').disabled = false;
+});
+
 
 /**
  * selectで選択したコンパイラに応じてコンパイラ切り替え
 */
-var compilerService = 'Wandbox';
 document.getElementById('compilerServiceSelect').addEventListener('change', async (e) => {
     compilerService = e.target.value;
 });
