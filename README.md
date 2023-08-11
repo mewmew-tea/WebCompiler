@@ -5,6 +5,8 @@ ElectronとHTML/JSの習作として開発した、オンラインC++コンパ�
 
 競技プログラミングのような問題を作問することもできます。  
 
+![Alt text](image.png)
+
 ## 作問方法
 
 問題の例は、[./example_problems/](https://github.com/mewmew-tea/WebCompiler/tree/master/example_problems)にあります。  
