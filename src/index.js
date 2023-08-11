@@ -64,9 +64,12 @@ function setCodeToEditor(code) {
 const { ipcRenderer } = require("electron");
 
 
-let timerInterval = 0;
+let timerInterval;
 let elapsedTime = 0;
 
+/**
+ * タイマーを開始する。
+ */
 function startTimer() {
   if (!timerInterval) {
     const startTime = Date.now() - elapsedTime;
@@ -74,6 +77,9 @@ function startTimer() {
   }
 }
 
+/**
+ * タイマーを停止する。
+ */
 function stopTimer() {
   if (timerInterval) {
     clearInterval(timerInterval);
@@ -81,12 +87,19 @@ function stopTimer() {
   }
 }
 
+/**
+ * タイマーをリセットする。タイマーを停止して、経過時間を0にする。
+ */
 function resetTimer() {
   stopTimer();
   elapsedTime = 0;
   updateTimer(Date.now());
 }
 
+/**
+ * タイマーを更新する。現在時間　-　開始時間　で経過時間を計算して表示する。
+ * @param {*} startTime 開始時間
+ */
 function updateTimer(startTime) {
   const currentTime = Date.now();
   elapsedTime = currentTime - startTime;
@@ -94,6 +107,11 @@ function updateTimer(startTime) {
   document.getElementById("timer").textContent = formattedTime;
 }
 
+/**
+ * 時間を文字列にフォーマットする
+ * @param {*} timeInMillis ミリ秒
+ * @returns フォーマットされた文字列
+ */
 function formatTime(timeInMillis) {
   const padZero = (num) => (num < 10 ? `0${num}` : num);
   const seconds = Math.floor(timeInMillis / 1000) % 60;
@@ -143,6 +161,17 @@ async function loadProblem(filePath)
     // JSON文字列をパースしてオブジェクトに変換
     const jsonObject = JSON.parse(jsonText);
     testCases = jsonObject.testCases;
+    // 誤差許容
+    if (jsonObject.errorMargin != null)
+    {
+        errorMargin = jsonObject.errorMargin;
+        isEnableErrorMargin = true;
+    }
+    else
+    {
+        errorMargin = 0.0;
+        isEnableErrorMargin = false;
+    }
     
     // 問題pdfファイル取得
     pdfEntry = jsZip.file('problem.pdf');
@@ -174,6 +203,15 @@ async function loadProblem(filePath)
     document.getElementById('buttonCompile').disabled = false;
 }
 
+var testCases;
+var pdfData;
+var currentProblemFilePath;
+
+// 許容する誤差
+let errorMargin = 0.0;
+// 誤差許容を有効にするか
+let isEnableErrorMargin = false;
+
 /**
  * テストケース表示を初期化する
  */
@@ -188,10 +226,6 @@ function initTestCasesView()
         outputsContainer.removeChild(outputsContainer.firstChild);
     }
 }
-
-var testCases;
-var pdfData;
-var currentProblemFilePath;
 
 /**
  * コンパイル・実行ボタンのコールバック
@@ -236,96 +270,86 @@ async function runWithPaizaIO() {
 
     initTestCasesView();
 
-    var currentCaseCnt = 1;
-    var collectCasesCnt = 0;
+    let currentCaseCnt = 1;
+    let collectCasesCnt = 0;
+    
+    const detailsResponses = await Promise.all(testCases.map(async (testCase) => {
+        const input = testCase.input;
+        const expect = testCase.expect;
 
+        const url = 'http://api.paiza.io/runners/create';
+        const data = {
+            'source_code': editor.getModel().getValue(),
+            'language': 'cpp',
+            'input': input,
+            'api_key': 'guest',
+        };
 
-    // 結果を格納する配列
-    var results = [];
+        const response = await fetch(url, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify(data)
+        });
 
-    for (const testCase of testCases) {
-        var id;     // コンパイル・実行のリクエストID
-        const input = testCase.input;   // 標準入力
-        const expect = testCase.expect; // 期待する標準出力
+        const responseData = await response.json();
+        const id = responseData.id;
 
-        //-----------------------------
-        // コンパイル・実行のリクエスト
-        //-----------------------------
-        // ※無名関数を即時実行して、変数名被りを防ぐ（C++でスコープ使うのと同じ目的）
-        await (async () => {
-            const url = 'http://api.paiza.io/runners/create';
+        await sleep(3000);
 
-            console.log(editor.getModel().getValue());
+        const detailsUrl = `http://api.paiza.io/runners/get_details?id=${id}&api_key=guest`;
 
-            const data = {
-                'source_code': editor.getModel().getValue(),
-                'language': 'cpp',
-                'input': input,
-                'api_key': 'guest',
-            };
+        // リクエストを送信
+        const detailsResponse = await fetch(detailsUrl);
+        return { response: detailsResponse, input, expect }; // オブジェクトを返す
+    }));
 
-            // コンパイル・実行
-            // ソースコードやコマンドライン引数などの情報を送信
-            const response = await fetch(url, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json'
-                },
-                body: JSON.stringify(data)
-            });
-            // if (response.ok) {
-            //     console.log("正常です");
-            // }
-            const responseData = await response.json();
-            id = responseData.id;
-            console.log(id);
-        })();
+    for (const details of detailsResponses) { // 各リクエストの結果を順番に処理
+        const detailsResponse = details.response;
+        const detailsData = await detailsResponse.json();
+        const input = details.input;
+        const expect = details.expect;
 
+        const buildErrorMsg = detailsData.build_stderr;
+        let isCollect = false;
+        
+        if (isEnableErrorMargin)
+        {
+            // スペース区切りで分割、すべての要素を数値に変換
+            const actual = detailsData.stdout.split(' ').map(Number);
+            const expected = expect.split(' ').map(Number);
+            
+            // 誤差を許容して、期待する出力と一致するか判定。誤差は+-で許容する。
+            isCollect = detailsData.build_result === 'success' && actual.every((v, i) => Math.abs(v - expected[i]) <= errorMargin);
+        }
+        else
+        {
+            isCollect = detailsData.build_result === 'success' && detailsData.stdout === expect;
+        }
 
-        await sleep(3000); // 3秒待つ
+        if (isCollect) {
+            collectCasesCnt++;
+        }
 
-        //-----------------------------
-        // コンパイル・実行結果の取得
-        //-----------------------------
-        // ※無名関数を即時実行して、変数名被りを防ぐ（C++でスコープ使うのと同じ目的）
-        await (async () => {
-            const url = `http://api.paiza.io/runners/get_details?id=${id}&api_key=guest`;
+        const successColor = '#5cc991';
+        const failColor = '#f88070';
 
-            // 出力結果をHTTP通信（GET）で取得
-            const response = await fetch(url);
-            const responseData = await response.json();
-            console.log(responseData);
-            console.log(responseData.stdout);
-
-            var buildErrorMsg = responseData.build_stderr;
-
-            var isCollect = responseData.build_result == 'success' && responseData.stdout == expect;
-
-            if (isCollect) {
-                collectCasesCnt++;
-            }
-
-            // 出力結果を表示
-
-            var successColor = '#5cc991';
-            var failColor = '#f88070';
-
-            const outputElement = document.createElement('div');
-            outputElement.style.border = `solid 4px ${isCollect ? successColor : failColor}`;
-            outputElement.innerText =
-                `【テストケース${currentCaseCnt}】${isCollect ? '正解！' : '不正解…'}
-（ビルド結果: ${responseData.build_result}: ${buildErrorMsg} ）
+        const outputElement = document.createElement('div');
+        outputElement.style.border = `solid 4px ${isCollect ? successColor : failColor}`;
+        outputElement.innerText =
+`【テストケース${currentCaseCnt}】${isCollect ? '正解！' : '不正解…'} 
+（ビルド結果: ${detailsData.build_result}: ${buildErrorMsg} ）
 # 標準入力
 ${input}
 # 標準出力
-${responseData.stdout}
+${detailsData.stdout}
 # 期待する出力
 ${expect}`;
 
-            outputsContainer.appendChild(outputElement);
+        outputsContainer.appendChild(outputElement);
 
-            currentCaseCnt++;
-        })();
+        currentCaseCnt++;
     }
 
     var isCollectAll = collectCasesCnt >= currentCaseCnt - 1;
@@ -389,7 +413,30 @@ async function runWithWandbox() {
 
             var successBuild = responseData.status == '0';
 
-            var isCollect = successBuild && responseData.program_output == expect;
+            var isCollect = false;
+        
+            // 誤差許容
+            if (isEnableErrorMargin)
+            {
+                // スペース区切りで分割、すべての要素を数値に変換
+                const actual = responseData.program_output.split(' ').map(Number);
+                const expected = expect.split(' ').map(Number);
+
+                // 要素数が一致するか確認
+                if (actual.length != expected.length)
+                {
+                    isCollect = false;
+                }
+                else
+                {
+                    // 誤差を許容して、期待する出力と一致するか判定。誤差は+-で許容する。
+                    isCollect = successBuild && actual.every((v, i) => Math.abs(v - expected[i]) <= errorMargin);
+                }
+            }
+            else
+            {
+                isCollect = successBuild && responseData.program_output == expect;
+            }
 
             if (isCollect) {
                 collectCasesCnt++;
@@ -517,6 +564,18 @@ ipcRenderer.on('json-selected', async (event, jsonPath) => {
         return;
     }
     testCases = json.testCases;
+    // 誤差許容
+    // errorMarginがjosnにあるかどうか
+    if (json.errorMargin != null)
+    {
+        errorMargin = json.errorMargin;
+        isEnableErrorMargin = true;
+    }
+    else
+    {
+        errorMargin = 0.0;
+        isEnableErrorMargin = false;
+    }
     initTestCasesView();
     
     // コンパイルボタン有効化
